@@ -1,0 +1,22 @@
+# Windows junk
+desktop.ini
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# VS Code
+.vscode/
+
+# Node
+node_modules/
+
+# Environment files
+.env
+
+# Uploads
+uploads/
+
+# Therapist workspace
+.therapist-booking.code-workspace
