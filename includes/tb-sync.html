@@ -1,0 +1,280 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>TB Sync Dashboard</title>
+        <style>
+            :root {
+                --bg: #1e1e1e;
+                --panel: #252526;
+                --border: #333;
+                --text: #cccccc;
+                --accent: #007acc;
+                --success: #4caf50;
+                --error: #f44336;
+            }
+            body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; font-size: 14px; }
+            .container { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+            
+            /* Panels */
+            .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 15px; display: flex; flex-direction: column; }
+            h2 { margin-top: 0; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; color: #fff; }
+            
+            /* Inputs */
+            label { display: block; margin-bottom: 5px; font-size: 12px; color: #888; }
+            input[type="text"], input[type="password"] { 
+                width: 100%; box-sizing: border-box; background: #3c3c3c; border: 1px solid var(--border); 
+                color: #fff; padding: 8px; margin-bottom: 15px; border-radius: 2px;
+            }
+            
+            /* Buttons */
+            button { 
+                background: var(--accent); color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 2px; font-weight: 500;
+            }
+            button:hover { opacity: 0.9; }
+            button.secondary { background: #3c3c3c; }
+            button.danger { background: #d32f2f; margin-top: auto; }
+            .btn-group { display: flex; gap: 5px; margin-bottom: 10px; }
+
+            /* File List */
+            #file-list { flex: 1; overflow-y: auto; max-height: 400px; border: 1px solid var(--border); padding: 5px; background: #1e1e1e; }
+            .file-item { display: flex; align-items: center; padding: 4px; border-bottom: 1px solid #333; }
+            .file-item:hover { background: #2a2d2e; }
+            .file-item label { margin: 0 0 0 10px; color: var(--text); cursor: pointer; flex: 1; }
+            .file-item input { margin: 0; }
+            
+            /* Logs */
+            #log-window { 
+                grid-column: 1 / -1; height: 200px; background: #000; border: 1px solid var(--border); 
+                overflow-y: scroll; padding: 10px; font-family: monospace; font-size: 12px; 
+            }
+            .log-entry { margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px; }
+            .log-success { color: var(--success); }
+            .log-error { color: var(--error); }
+            .log-info { color: #888; }
+            
+            /* Utility */
+            .status-bar { margin-top: 10px; font-size: 12px; color: #fff; display: flex; justify-content: space-between;}
+        </style>
+    </head>
+    <body>
+
+    <div class="container">
+        <!-- Config Panel -->
+        <div class="panel">
+            <h2>Configuration</h2>
+            <label>Helper URL (Local)</label>
+            <input type="text" id="cfg-helper" value="http://localhost/therapist-booking/includes/tb-sync-helper.php">
+            
+            <label>Live URL (Target)</label>
+            <input type="text" id="cfg-live" value="https://hypnova.ch/stargazer">
+            
+            <label>Secret Key</label>
+            <input type="password" id="cfg-key" value="YOUR_SUPER_SECRET_KEY_12345">
+
+            <button onclick="saveConfig()" class="secondary">Save Config</button>
+            <div style="margin-top: 20px;"></div>
+            
+            <h2>Quick Actions</h2>
+            <div class="btn-group">
+                <button class="secondary" onclick="loadFiles('includes')">Scan Includes</button>
+                <button class="secondary" onclick="loadFiles('assets')">Scan Assets</button>
+            </div>
+            <label>Custom Folder Scan</label>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="scan-target" placeholder="e.g. templates" style="margin-bottom:0">
+                <button class="secondary" onclick="loadFiles(document.getElementById('scan-target').value)">Go</button>
+            </div>
+        </div>
+
+        <!-- File Browser Panel -->
+        <div class="panel">
+            <h2>File Explorer <span id="current-dir" style="font-weight:normal; color:#888; font-size:12px; margin-left:10px;"></span></h2>
+            
+            <div class="btn-group">
+                <button onclick="selectAll(true)" class="secondary" style="font-size: 11px;">Select All</button>
+                <button onclick="selectAll(false)" class="secondary" style="font-size: 11px;">Select None</button>
+            </div>
+
+            <div id="file-list">
+                <div style="padding:20px; text-align:center; color:#555;">Select a folder to scan files...</div>
+            </div>
+
+            <div class="status-bar">
+                <span id="selection-count">0 files selected</span>
+                <button onclick="syncSelected()">🚀 Sync Selected Files</button>
+            </div>
+        </div>
+
+        <!-- Logger -->
+        <div id="log-window"></div>
+    </div>
+
+    <script>
+    // ============================================
+    // LOGIC & STATE
+    // ============================================
+    let fileCache = [];
+
+    // On Load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadConfig();
+    });
+
+    // UI: Logger
+    function log(msg, type = 'info') {
+        const box = document.getElementById('log-window');
+        const entry = document.createElement('div');
+        entry.className = `log-entry log-${type}`;
+        
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        entry.textContent = `[${time}] ${msg}`;
+        
+        box.appendChild(entry);
+        box.scrollTop = box.scrollHeight;
+        console.log(msg); // Keep console active too
+    }
+
+    // CONFIG: Save/Load to LocalStorage
+    function saveConfig() {
+        localStorage.setItem('tb_helper', document.getElementById('cfg-helper').value);
+        localStorage.setItem('tb_live', document.getElementById('cfg-live').value);
+        localStorage.setItem('tb_key', document.getElementById('cfg-key').value);
+        log('Configuration saved to browser.', 'success');
+    }
+
+    function loadConfig() {
+        if(localStorage.getItem('tb_helper')) document.getElementById('cfg-helper').value = localStorage.getItem('tb_helper');
+        if(localStorage.getItem('tb_live')) document.getElementById('cfg-live').value = localStorage.getItem('tb_live');
+        if(localStorage.getItem('tb_key')) document.getElementById('cfg-key').value = localStorage.getItem('tb_key');
+    }
+
+    // API: Get Config Objects
+    function getConfig() {
+        return {
+            helperUrl: document.getElementById('cfg-helper').value,
+            liveUrl: document.getElementById('cfg-live').value,
+            secretKey: document.getElementById('cfg-key').value
+        };
+    }
+
+    // CORE: Load Files (Action: list)
+    async function loadFiles(dir) {
+        if(!dir) return log('Please specify a directory', 'error');
+        
+        const cfg = getConfig();
+        const listDiv = document.getElementById('file-list');
+        listDiv.innerHTML = '<div style="padding:10px;">Scanning...</div>';
+        document.getElementById('current-dir').textContent = `/${dir}`;
+
+        try {
+            const params = new URLSearchParams({ action: 'list', dir: dir });
+            const res = await fetch(`${cfg.helperUrl}?${params}`);
+            if(!res.ok) throw new Error(`Helper HTTP ${res.status}`);
+            
+            const data = await res.json();
+            const files = data.files || [];
+            
+            fileCache = files; // Store for syncing
+            renderFiles(files);
+            log(`Found ${files.length} files in '${dir}'`, 'success');
+        } catch (e) {
+            listDiv.innerHTML = `<div style="color:red; padding:10px;">Error: ${e.message}</div>`;
+            log(`Scan failed: ${e.message}`, 'error');
+        }
+    }
+
+    // UI: Render List
+    function renderFiles(files) {
+        const listDiv = document.getElementById('file-list');
+        listDiv.innerHTML = '';
+
+        if(files.length === 0) {
+            listDiv.innerHTML = '<div style="padding:10px;">No files found.</div>';
+            return;
+        }
+
+        files.forEach(file => {
+            // Assume file is string "path/to/file.php" or object { source, target }
+            const path = (typeof file === 'string') ? file : file.source;
+            
+            const row = document.createElement('div');
+            row.className = 'file-item';
+            row.innerHTML = `
+                <input type="checkbox" class="file-chk" value="${path}" onchange="updateCount()">
+                <label onclick="this.previousElementSibling.click()">${path}</label>
+            `;
+            listDiv.appendChild(row);
+        });
+        updateCount();
+    }
+
+    // UI: Selection Helpers
+    function selectAll(check) {
+        document.querySelectorAll('.file-chk').forEach(el => el.checked = check);
+        updateCount();
+    }
+
+    function updateCount() {
+        const count = document.querySelectorAll('.file-chk:checked').length;
+        document.getElementById('selection-count').textContent = `${count} files selected`;
+    }
+
+    // CORE: Sync Process
+    async function syncSelected() {
+        const checkboxes = document.querySelectorAll('.file-chk:checked');
+        if(checkboxes.length === 0) return log('No files selected', 'error');
+
+        const cfg = getConfig();
+        log(`Starting sync of ${checkboxes.length} files...`, 'info');
+
+        for (const chk of checkboxes) {
+            const filePath = chk.value;
+            await syncSingleFile(filePath, filePath, cfg);
+        }
+        
+        log('Batch sync complete!', 'success');
+    }
+
+    async function syncSingleFile(relativePath, targetPath, cfg) {
+        try {
+            // 1. Read Local
+            const helperParams = new URLSearchParams({ action: 'read', file: relativePath });
+            const readRes = await fetch(`${cfg.helperUrl}?${helperParams}`);
+            
+            if (!readRes.ok) throw new Error(`Read failed: ${readRes.status}`);
+            const content = await readRes.text();
+
+            // 2. Upload Remote
+            const uploadUrl = `${cfg.liveUrl}/wp-json/tbsync/v1/upload`;
+            const payload = {
+                file_path: targetPath,
+                content: btoa(unescape(encodeURIComponent(content)))
+            };
+
+            const uploadRes = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Sync-Key': cfg.secretKey
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (uploadRes.ok) {
+                log(`✓ Synced: ${relativePath}`, 'success');
+                return true;
+            } else {
+                const errTxt = await uploadRes.text();
+                log(`✗ Failed: ${relativePath} - ${errTxt}`, 'error');
+                return false;
+            }
+        } catch (e) {
+            log(`✗ Error ${relativePath}: ${e.message}`, 'error');
+            return false;
+        }
+    }
+    </script>
+    </body>
+    </html>

@@ -1,0 +1,11 @@
+// {
+//     "emeraldwalk.runonsave": {
+//         "commands": [
+//             {
+//                 "match": "\\.php$",
+//                 "isAsync": true,
+//                 "cmd": "node \"${workspaceFolder}/sync-script.js\" \"${file}\""
+//             }
+//         ]
+//     }
+// }
