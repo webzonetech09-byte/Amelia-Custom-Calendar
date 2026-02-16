@@ -22,4 +22,6 @@ node_modules/
 uploads/
 
 # Therapist workspace
-.therapist-booking.code-workspace
+therapist-booking.code-workspace
+# gitignore
+.gitignore
