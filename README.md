@@ -102,5 +102,5 @@ The booking data is stored in `tbState` JavaScript object:
 ---
 
 **Version:** 1.0.0  
-**Author:** Your Name  
+**Author:** Web Zone Tech 
 **License:** GPL v2 or later
