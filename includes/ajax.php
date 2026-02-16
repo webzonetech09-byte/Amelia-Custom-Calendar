@@ -20,6 +20,8 @@ add_action('wp_ajax_tb_get_therapist_availability', 'tb_ajax_get_therapist_avail
 add_action('wp_ajax_nopriv_tb_get_therapist_availability', 'tb_ajax_get_therapist_availability');
 
 function tb_ajax_get_therapist_availability() {
+
+    //comments add to therapist availability
     
     // Log the request
     tb_log('[TB AJAX] === Availability Request Received ===');
