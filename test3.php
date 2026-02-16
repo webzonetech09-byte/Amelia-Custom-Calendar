@@ -1,1 +1,0 @@
-<?php echo 'it is antoher file';?>
