@@ -1,14 +1,14 @@
 <?php
 /**
  * Plugin Name: Therapist Booking System
- * Description: Modern 3-step booking form for therapist services
- * Version: 2.0.1
- * Author: Sajid Sattar
- * Author URI: https://fiverr.com/ranasattar
- */
+  * Description: Modern 3-step booking form for therapist services
+   * Version: 2.0.1
+    * Author: Sajid Sattar
+     * Author URI: https://fiverr.com/ranasattar
+      */
 
-if (!defined('ABSPATH')) exit;
-
+      if (!defined('ABSPATH')) exit;
+      
 /**
  * Start session for selection persistence
  */
